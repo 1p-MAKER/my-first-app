@@ -1,0 +1,46 @@
+name: Update Alexa morning news
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 21:00 UTC = 06:00 JST on the following day.
+    # Sunday-Thursday UTC produces Monday-Friday morning news in Japan.
+    - cron: '0 21 * * 0-4'
+
+permissions:
+  contents: write
+
+jobs:
+  update-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate grounded Alexa feed with Gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.8-flash
+        run: python generate_news.py
+
+      - name: Commit updated feed
+        run: |
+          if git diff --quiet -- docs/feed.json; then
+            echo "No feed changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/feed.json
+          git commit -m "Update Alexa morning news"
+          git push
