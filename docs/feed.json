@@ -1,0 +1,9 @@
+[
+  {
+    "uid": "daily-news-setup-1",
+    "updateDate": "2026-09-09T23:30:00Z",
+    "titleText": "朝のニュース セットアップ確認",
+    "mainText": "おはようございます。朝のニュース配信はセットアップ中です。Gemini APIキーとGitHub Pagesの設定が完了すると、平日の朝に最新ニュースへ自動更新されます。",
+    "redirectionUrl": "https://github.com/1p-MAKER/my-first-app"
+  }
+]
