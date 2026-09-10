@@ -1,80 +1,102 @@
-# Alexa Morning News with Gemini
+# Alexa Morning News
 
-Gemini API + Google Searchで過去48時間のニュースを調べ、日本語のAlexa Flash Briefingを生成します。OpenAI APIは使用しません。
+平日06:00にGemini API + Google Searchでニュースを調査し、5〜7分を目安に日本語原稿を作成。GitHub Pagesの `feed.json` をAlexaが07:15に読み上げる構成です。OpenAI APIは使いません。
+
+プロジェクトフォルダ: `/Users/the1/projects/alexa-morning-news`
 
 ## 最短セットアップ
 
-修正ブランチをレビューし、mainへマージしてから進めてください。ブランチのpushだけでは定期実行や本番配信は変わりません。
+1. 作業ブランチ `codex/alexa-news-reliability` をレビューし、mainへ反映します。ブランチのpushだけでは本番や定期実行は変わりません。
+2. [GitHub Actions Secrets](https://github.com/1p-MAKER/my-first-app/settings/secrets/actions) → New repository secret → **GEMINI_API_KEY** に、有料枠のGemini APIキーを登録。キーをチャット・コード・Git履歴に貼らないでください。
+3. [Pages設定](https://github.com/1p-MAKER/my-first-app/settings/pages) → Build and deployment → Sourceを **GitHub Actions** にします。配信元は `docs/` ですが、「Deploy from a branch」は選びません。
+4. [Actions](https://github.com/1p-MAKER/my-first-app/actions/workflows/update-news.yml) → **Update Alexa morning news** → Run workflow → **main**。初回はforceをオフのまま実行できます。
+5. `generate` と `deploy` の成功、および [feed.json](https://1p-maker.github.io/my-first-app/feed.json) の更新日時と5項目を確認。出典と原稿は[ニュースページ](https://1p-maker.github.io/my-first-app/)で確認できます。
+6. [Alexa Developer Console](https://developer.amazon.com/alexa/console/ask)で日本語の **Flash Briefing** スキルを作成し、フィードを追加します。
 
-1. [Actions Secrets](https://github.com/1p-MAKER/my-first-app/settings/secrets/actions) → New repository secret → 名前を `GEMINI_API_KEY` にし、有料枠のGemini APIキーを登録。キーをチャットやファイルに貼らないでください。
-2. [Pages設定](https://github.com/1p-MAKER/my-first-app/settings/pages) → Build and deployment → Sourceを **GitHub Actions** に設定。以前の「Deploy from a branch / main / docs」は使いません。配信対象は引き続き `docs/` です。GITHUB_TOKENでのコミットは通常のPagesビルドを起動しないため、専用のPagesデプロイ処理を使います。
-3. [Actions](https://github.com/1p-MAKER/my-first-app/actions/workflows/update-news.yml) → **Update Alexa morning news** → Run workflow → `main` → Run workflow。
-4. `update-news` と `deploy` の両方が成功し、[feed.json](https://1p-maker.github.io/my-first-app/feed.json) が最新の5項目になったことを確認。デプロイ後にも公開JSONと今回の生成物の一致を自動検証します。
-5. [Alexa Developer Console](https://developer.amazon.com/alexa/console/ask) → Create Skill → Japanese (JP) → Flash Briefing。フィードを追加し、Content typeはText、Update frequencyはDaily、GenreはNews、Feed URLは次を入力します。
+   - Content type: **Text**
+   - Update frequency: **Daily**
+   - Genre: **News**
+   - Feed URL: **https://1p-maker.github.io/my-first-app/feed.json**
 
-   `https://1p-maker.github.io/my-first-app/feed.json`
+7. Consoleの必要項目を保存し、開発テストを有効にします。同じAmazonアカウントのAlexaアプリで開発中スキルを有効にし、フラッシュニュースの提供元へ追加。Echoで手動再生を確認してから、**月〜金07:15 → ニュースを再生 → 使用するEcho** の定型アクションを設定します。一般公開は別途申請が必要です。
 
-6. Consoleで必要な名前・説明・エラーメッセージ等を入力し、開発テストを有効にします。同じAmazonアカウントのAlexaアプリで開発中のスキルを有効にし、フラッシュニュースの提供元に追加。まずEchoで手動再生を確認します。一般公開には別途申請が必要です。
-7. Alexaアプリの定型アクションを **月〜金 07:15 → ニュース／フラッシュニュースを再生 → 使用するEcho** に設定。ほかの提供元も有効なら合計の再生時間は長くなります。
+Alexa側のキャッシュにより、更新反映に30分程度かかることがあります。URLに `/docs` は付きません。ほかのニュース提供元を有効にすると総再生時間が増えます。
 
-Alexaはフィードをキャッシュするため、更新が再生に反映されるまで最大30分程度を見込んでください。公開URLには `/docs` を付けません。カスタムドメインを設定する場合は生成コードの `REPO_URL` も変更してください。
+## 仕組み
 
-## 動作と時刻
+```text
+06:00 JST ─ 公開済みの当日版があるか確認
+               ├ 有効な当日版あり → APIを使わず終了
+               └ 未更新 → Gemini検索調査 → 検索なしでJSON原稿編集
+                           → 検証 → 生成物保存 → Pages配信 → 公開結果照合
+                           → 公開済み原稿をGitに保存
+06:25 JST ─ もう一度公開を確認。未更新の場合だけ生成・配信
+07:15 JST ─ Alexa定型アクションで読み上げ
+```
 
-- cron `0 21 * * 0-4`：日〜木21:00 UTC = 月〜金06:00 JST。祝日も動きます。
-- GitHubのscheduleはmain上で動きます。混雑時の遅延・取りこぼしがあり、06:00開始や07:15までの完了は保証されません。公開リポジトリでは60日間活動がないと定期実行が停止される場合もあります。Actionsの失敗通知を有効にしてください。
-- workflow_dispatchで手動実行できます。main以外では生成物を `alexa-news` artifactとして保存するだけで、コミット・本番配信しません。新しいworkflow_dispatch設定はmainにマージ後に利用します。
-- mainでは検証済みのfeed・出典ページ・grounding情報をコミットし、同じ `docs/` をPagesに配信。同一ブランチの実行を直列化します。
-- mainのブランチ保護がbotのpushを禁止する場合、保存ステップで失敗します。保護ルールは自動変更しません。キー登録だけではこの制限を回避できません。
-- 生成・検証失敗時は既存feedを維持してジョブを失敗にします。古いニュースを新しい日付に付け替えません。Alexaは7日より古い項目を無視します。
+- 平日は月〜金。祝日も実行します。UTC cronは `0 21 * * 0-4` と `25 21 * * 0-4`。
+- 通常は **調査1回 + 編集1回** のGemini呼び出し。文字数・出典ID・日時等に不備があれば、同じ検索根拠を使って編集だけを最大2回やり直します。
+- 検索根拠がない場合の調査再試行は1回。一時的な通信障害は各リクエスト最大3試行。全体の生成ジョブは15分で打ち切ります。再試行も課金対象になり得ます。
+- 当日版の判定は、公開日時・本文のハッシュ・生成コード・モデル・配信URLの一致で行います。古い本文を新しい日付に付け替えません。forceをオンにすると公開済みでも再生成します。
+- 同じブランチの実行は直列化。main以外での手動実行は生成物の保存までで、Pages配信・mainへの書き込みはしません。
+- **配信はGitへの保存に依存しません。** `archive` のpushに失敗しても、成功した配信は取り消しません。
+- GitHubのscheduleは遅延や取りこぼしがあり、06:00開始・07:15までの完了を保証しません。公開リポジトリでは60日間活動がないと停止される場合があります。公開後のGit保存は履歴維持にも使いますが、Actionsの失敗通知と有効状態も確認してください。
 
-## APIと原稿
-
-2026-09-10にGoogle公式資料で `gemini-3.8-flash` とGoogle Search対応を確認。Python 3.12の標準ライブラリで、公式に掲載されているREST `v1beta/models/{model}:generateContent` に `tools: [{"google_search": {}}]` を送信します。認証は `x-goog-api-key` ヘッダー。SDKバージョンへの依存はありません。Generate Contentは公式資料上Legacy分類ですが、掲載中のAPIを明示して使用しています。元のInteractions形式そのものが誤りという意味ではありません。
-
-モデルはActions Variablesの `GEMINI_MODEL` で変更可能。互換性は変更時に再確認してください。タイムアウトは1リクエスト120秒、429・一時的なサーバー／ネットワーク障害を最大3回試行。原稿不正時の再生成は最大1回です。再試行には追加料金が発生し得ます。
-
-現在の日本時間、過去48時間の範囲、今後24時間の終端を毎回プロンプトに付与します。検索クエリ・Web出典・引用対応情報がない応答や未完了応答を拒否します。ただし検索根拠の存在は個々の事実や全カテゴリの取材品質を保証しないため、初回は出典ページと読み上げを確認してください。
+## 原稿の内容と検証
 
 1. 今朝の3大ニュース
 2. 日本・沖縄
-3. 世界情勢と重要な論点の2つの視点
-4. 株・為替・金利・金・原油、経済への影響
-5. 新商品・新サービス・AI／テック、背景、今後24時間の予定（日本時間）
+3. 世界情勢と同じ重要論点に対する2つの視点
+4. 株・為替・金利・金・原油と経済への影響
+5. 新商品・新サービス・AI／テック・背景・今後24時間の予定
 
-全体1,800〜2,400文字を検証し、毎分約350文字として約5〜7分を目指します。実際の長さはEchoの読み方・項目間の音で変わります。短い文で説明し、休場・未確認値・不明な予定を推測で埋めないよう指定しています。
+各分野を必須フィールドにし、確認済みとする原稿には実際の検索出典IDを要求します。根拠不足なら定型の「確認できませんでした」に置き換えます。予定は日時と時差を検査して日本時間の案内を組み立てます。
 
-## 出力と検証
+Alexaフィードは5項目、必須5フィールド、UTC日時、重複しないUID、HTTPSリンク。各本文はUTF-16換算でも4,300文字以下、全体1,800〜2,400文字を検証します。長すぎる原稿を切り捨てません。5〜7分は毎分約350文字からの目安で、実際の長さはEchoで確認してください。
 
-- `docs/feed.json`：常に5件。必須項目 `uid`, `updateDate`, `titleText`, `mainText`, `redirectionUrl`。UTC日時、内容変更時に変わるUID、HTTPSリンク。
-- `mainText`：各4,300文字以内（UTF-16換算でも上限確認）。空文字・不正型・URL・HTML等・重複本文を拒否。長すぎる原稿は切り捨てず再生成するため、末尾の予定が消えません。
-- `docs/index.html`：原稿、出典リンク、APIが返すGoogle Search Suggestionsを表示。AlexaのRead Moreリンク先。
-- `docs/grounding.json`：APIの検索・引用対応情報。生成JSONの元テキストに対する対応情報であり、整形後本文の文字位置とは限りません。
-- `tests/`：通信を模したテスト。実API・料金・実機再生の成功とは別です。
+検索出典の存在・ID・項目・文字数・時刻範囲はコードで検証できますが、記事の正確さ、選定の良さ、各原稿と出典の意味上の一致までは保証できません。初回は出典ページと読み上げを確認してください。
 
-## ローカル確認
+## 出力と復旧
+
+| ファイル・ジョブ | 用途 |
+|---|---|
+| `docs/feed.json` | Alexa向け原稿 |
+| `docs/index.html` | 原稿、分野別出典、調査時の引用、Google Search Suggestions |
+| `docs/manifest.json` | 生成日時・本文ハッシュ・モデル・未確認分野・API使用量 |
+| `work/research.json` | ローカル調査結果。Git対象外 |
+| `work/draft.json` | ローカルの検証済み構造化原稿。Git対象外 |
+| `alexa-news` artifact | 検証済み生成物。7日保持 |
+| `news-diagnostics` artifact | 生成失敗時に取得済みの調査情報。3日保持 |
+
+**公開だけ失敗した場合**はActionsの **Re-run failed jobs** を使います。成功した生成ジョブのartifactを再利用し、検索からやり直しません。生成物が当日の6時間以内で、より新しい版が公開されていない場合に限り再配信します。古い場合はRun workflowで再生成してください。
+
+**generate失敗**なら既存の公開版を維持。Secret、APIの課金・制限、Actionsログを確認します。`deploy` で公開照合だけが失敗した場合は、配信自体は完了している可能性があります。
+
+**archiveだけ失敗**ならニュース配信は確認済みです。mainのブランチ保護・書き込み権限・他のpushとの競合を確認し、そのジョブだけ再実行してください。保護設定は自動変更しません。
+
+## ローカル作業
+
+Python 3.12、追加パッケージ不要です。
 
 ```sh
+cd /Users/the1/projects/alexa-morning-news
 python3 -m unittest discover -s tests -v
-# GEMINI_API_KEY を安全な環境変数管理で設定した上で実行
+# GEMINI_API_KEYを安全な環境変数管理で設定後
 python3 generate_news.py
 ```
 
-追加パッケージのインストールは不要です。APIキーをコードやGit履歴に保存しないでください。
+`GEMINI_MODEL` でモデルを変更できます。標準は `gemini-3.8-flash`。カスタムドメインの場合はローカルの `SITE_URL` とActions Variablesの `SITE_URL`を実際のPages URLに合わせてください。
 
-## 困った場合
+詳細な設計・失敗時の扱いは [SPEC.md](SPEC.md)、作業ルールは [AGENTS.md](AGENTS.md) に記載しています。
 
-- Secret missing：Secret名と登録先を確認。
-- HTTP 400 / 403 / 404：モデル名、キーのAPI制限、対象プロジェクト・APIの有効化を確認。
-- HTTP 429：クォータ・課金状態・実行頻度を確認。無制限な再実行はしません。
-- Invalid grounded news：検索根拠、JSON、文字数等の検証に不合格。既存feedは保持。手動実行してartifactを確認。
-- Pages deploy失敗：SourceがGitHub Actionsか、github-pages環境のmain配信許可、Pagesの利用条件を確認。
-- 公開検証失敗：配信自体が成功している可能性があります。URLのJSON、Content-Type、生成artifactを確認してから再実行。
+## APIの確認根拠
 
-## 公式資料
+2026-09-10にGoogle公式モデル資料とAPIのDiscovery定義を確認。公式掲載の `v1beta/models/{model}:generateContent` を使います。調査は `google_search`、編集は `responseMimeType: application/json` + `responseJsonSchema`。APIキーは `x-goog-api-key` ヘッダーのみ。Generate Contentは公式資料でLegacyに分類されていますが、現在掲載されているAPIを使用しています。
 
-- [Gemini Google Search / REST](https://ai.google.dev/gemini-api/docs/generate-content/google-search)
-- [GITHUB_TOKENとPagesビルド](https://docs.github.com/en/actions/concepts/security/github_token)
+- [Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)
+- [Google Search grounding](https://ai.google.dev/gemini-api/docs/generate-content/google-search)
+- [構造化出力](https://ai.google.dev/gemini-api/docs/generate-content/structured-output)
+- [API Discovery定義](https://generativelanguage.googleapis.com/$discovery/rest?version=v1beta)
 - [Pagesカスタムワークフロー](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
-- [Actionsスケジュール](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+- [Actionsスケジュールの制約](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
 - [Alexa Feed仕様](https://developer.amazon.com/en-US/docs/alexa/flashbriefing/flash-briefing-skill-api-feed-reference.html)

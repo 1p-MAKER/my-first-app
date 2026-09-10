@@ -2,9 +2,18 @@ name: Update Alexa morning news
 
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: '当日分が公開済みでも再生成する（追加API料金）'
+        type: boolean
+        default: false
   schedule:
-    # Sunday–Thursday 21:00 UTC = Monday–Friday 06:00 JST.
+    # Sunday–Thursday UTC = Monday–Friday JST. Recovery does no API work if current.
     - cron: '0 21 * * 0-4'
+    - cron: '25 21 * * 0-4'
+
+env:
+  SITE_URL: ${{ vars.SITE_URL || 'https://1p-maker.github.io/my-first-app/' }}
 
 permissions:
   contents: read
@@ -14,68 +23,66 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  update-news:
+  generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write
+    timeout-minutes: 15
+    outputs:
+      changed: ${{ steps.news.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Check Secret
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo '::error::Register GEMINI_API_KEY in Settings > Secrets and variables > Actions.'
-            exit 1
-          fi
       - name: Offline regression tests
         run: python -m unittest discover -s tests -v
-      - name: Generate and validate grounded news
+      - name: Check freshness, research, edit and validate
+        id: news
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
-        run: python generate_news.py
-      - name: Save feed and sources on main
-        if: github.ref == 'refs/heads/main'
+          FORCE_REGENERATE: ${{ inputs.force || false }}
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/feed.json docs/index.html docs/grounding.json
-          if ! git diff --cached --quiet; then
-            git commit -m 'Update Alexa morning news'
-            git push origin HEAD:main
+          args=()
+          if [ "$FORCE_REGENERATE" = 'true' ]; then
+            args+=(--force)
           fi
-      - name: Save reviewable output
+          python generate_news.py "${args[@]}"
+      - name: Save validated edition
+        if: steps.news.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: alexa-news
           path: docs/
           retention-days: 7
       - name: Package Pages site
-        if: github.ref == 'refs/heads/main'
+        if: steps.news.outputs.changed == 'true' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
+      - name: Save research for failure diagnosis
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: news-diagnostics
+          path: work/research.json
+          if-no-files-found: ignore
+          retention-days: 3
 
   deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: update-news
+    if: github.ref == 'refs/heads/main' && needs.generate.outputs.changed == 'true'
+    needs: generate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      contents: read
       pages: write
       id-token: write
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy validated docs
-        id: deployment
-        uses: actions/deploy-pages@v4
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -84,7 +91,47 @@ jobs:
         with:
           name: alexa-news
           path: expected-news
-      - name: Verify public feed matches this run
+      - name: Reject expired or older editions
+        run: python verify_public_feed.py --before-deploy
+      - name: Deploy validated edition
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify public edition matches this run
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: python verify_public_feed.py
+
+  archive:
+    # A repository snapshot is useful, but it must never prevent delivery.
+    needs: [generate, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          name: alexa-news
+          path: expected-news
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Ensure this edition is still public before archiving
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: python verify_public_feed.py
+      - name: Save the published edition in Git
+        run: |
+          cp expected-news/feed.json docs/feed.json
+          cp expected-news/index.html docs/index.html
+          cp expected-news/manifest.json docs/manifest.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/feed.json docs/index.html docs/manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Archive published Alexa morning news'
+            git push origin HEAD:main
+          fi

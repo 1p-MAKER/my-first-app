@@ -3,3 +3,7 @@ __pycache__/
 .env
 .env.*
 *.json.tmp
+work/
+expected-news/
+published-news/
+news-stage-*/
