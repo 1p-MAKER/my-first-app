@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "generated_at": "2026-09-10T03:10:14Z",
+  "fingerprint": "444952015a32dd9db4816223ffa96b76fce057b498011bbaad2ef974346d72b4",
+  "model": "gemini-3.8-flash",
+  "feed_sha256": "04fdc2be9b700f631bd8dd1c91048dc50e2e436822f4a7cbca54436f7d37fac3",
+  "characters": 1910,
+  "unconfirmed_topics": [
+    "products"
+  ],
+  "search_query_count": 5,
+  "api_attempts": 2,
+  "usage": [
+    {
+      "stage": "research",
+      "promptTokenCount": 666,
+      "candidatesTokenCount": 3669,
+      "thoughtsTokenCount": 646,
+      "totalTokenCount": 4981
+    },
+    {
+      "stage": "edit",
+      "promptTokenCount": 12851,
+      "candidatesTokenCount": 1876,
+      "totalTokenCount": 14727
+    }
+  ]
+}
