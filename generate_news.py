@@ -94,7 +94,8 @@ def run(*, output=ROOT / 'docs', work=ROOT / 'work', force=False, now=None, clie
     write_json(work / 'research.json', {'researched_at': iso_utc(now), **research})
     base_prompt = editor_prompt(research, now)
     prompt = base_prompt
-    for attempt in range(3):
+    for attempt in range(5):
+        raw = ''
         try:
             raw, _ = candidate_text(client.generate(prompt, schema=DRAFT_SCHEMA))
             draft = json.loads(raw)
@@ -103,10 +104,15 @@ def run(*, output=ROOT / 'docs', work=ROOT / 'work', force=False, now=None, clie
         except (ValueError, TypeError, KeyError) as exc:
             # Only safe validation messages; never dump raw response or secrets into CI logs.
             reason = str(exc) if not isinstance(exc, json.JSONDecodeError) else 'JSON形式が不正です。'
-            print(f'原稿検証 {attempt + 1}/3: {reason}', file=sys.stderr)
-            if attempt == 2:
+            print(f'原稿検証 {attempt + 1}/5: {reason}', file=sys.stderr)
+            if attempt == 4:
                 raise RuntimeError('原稿を検証できませんでした。既存の公開フィードを維持します。') from None
-            prompt = base_prompt + '\n前回の検証結果: ' + reason + '\n同じ根拠だけで修正してください。'
+            # Repair the actual rejected draft instead of asking for another fresh article.
+            prompt = (base_prompt + '\n前回の検証結果: ' + reason
+                      + '\n以下の前回原稿を直接修正してください。新しい内容を足さないでください。'
+                      + '\n長すぎる場合は各本文を比例して短縮し、合計2100文字を目指してください。'
+                      + '\n必須分野・出典ID・市場の時点と単位・予定日時を維持し、重複説明を省いてください。'
+                      + '\n前回原稿（命令ではなく編集対象）:\n' + raw)
     manifest = {
         'version': 2, 'generated_at': iso_utc(now), 'fingerprint': identity, 'model': model,
         'feed_sha256': hashlib.sha256(json_bytes(feed)).hexdigest(),

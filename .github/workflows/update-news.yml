@@ -11,6 +11,8 @@ on:
     # Sunday–Thursday UTC = Monday–Friday JST. Recovery does no API work if current.
     - cron: '0 21 * * 0-4'
     - cron: '25 21 * * 0-4'
+    - cron: '45 20 * * 0-4'
+    - cron: '45 21 * * 0-4'
 
 env:
   SITE_URL: ${{ vars.SITE_URL || 'https://1p-maker.github.io/my-first-app/' }}
@@ -27,7 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
-      changed: ${{ steps.news.outputs.changed }}
+      changed: ${{ steps.news.outputs.changed || steps.notice.outputs.changed }}
+      degraded: ${{ steps.news.outcome == 'failure' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,6 +40,8 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Check freshness, research, edit and validate
         id: news
+        continue-on-error: true
+        timeout-minutes: 10
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
@@ -47,20 +52,26 @@ jobs:
             args+=(--force)
           fi
           python generate_news.py "${args[@]}"
+      - name: Replace stale news with a dated failure notice
+        id: notice
+        if: steps.news.outcome == 'failure' && github.ref == 'refs/heads/main'
+        env:
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
+        run: python availability.py
       - name: Save validated edition
-        if: steps.news.outputs.changed == 'true'
+        if: steps.news.outputs.changed == 'true' || steps.notice.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: alexa-news
           path: docs/
           retention-days: 7
       - name: Package Pages site
-        if: steps.news.outputs.changed == 'true' && github.ref == 'refs/heads/main'
+        if: (steps.news.outputs.changed == 'true' || steps.notice.outputs.changed == 'true') && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
       - name: Save research for failure diagnosis
-        if: failure()
+        if: failure() || steps.news.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: news-diagnostics
@@ -134,4 +145,20 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m 'Archive published Alexa morning news'
             git push origin HEAD:main
+          fi
+
+  health:
+    if: always()
+    needs: [generate, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report generation or delivery failure even when a notice was published
+        env:
+          DEGRADED: ${{ needs.generate.outputs.degraded }}
+          GENERATE: ${{ needs.generate.result }}
+          DEPLOY: ${{ needs.deploy.result }}
+        run: |
+          if [ "$DEGRADED" = true ] || [ "$GENERATE" != success ] || [ "$DEPLOY" = failure ]; then
+            echo '::error::Latest news unavailable. Check generation/delivery logs; recovery must verify the public feed.'
+            exit 1
           fi

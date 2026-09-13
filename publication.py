@@ -18,7 +18,7 @@ def json_bytes(data):
 
 def fingerprint(model, site_url):
     digest = hashlib.sha256((model + "\n" + site_url).encode())
-    for name in ("generate_news.py", "gemini_client.py", "news_content.py", "publication.py"):
+    for name in ("generate_news.py", "gemini_client.py", "news_content.py", "publication.py", "availability.py"):
         digest.update((ROOT / name).read_bytes())
     return digest.hexdigest()
 
@@ -37,9 +37,15 @@ def fetch_json(url):
 
 
 def validate_manifest(manifest, feed):
-    validate_feed(feed)
     if not isinstance(manifest, dict) or manifest.get("version") != 2:
         raise ValueError("公開マニフェストの版が不正です。")
+    if manifest.get('status') == 'unavailable':
+        from availability import notice_feed
+        generated = datetime.fromisoformat(manifest['generated_at'].replace('Z', '+00:00'))
+        if feed != notice_feed(generated):
+            raise ValueError('更新失敗の案内が不正です。')
+    else:
+        validate_feed(feed)
     expected = hashlib.sha256(json_bytes(feed)).hexdigest()
     if manifest.get("feed_sha256") != expected:
         raise ValueError("公開フィードとマニフェストが一致しません。")
@@ -54,7 +60,8 @@ def already_published(site_url, now, expected_fingerprint):
         feed = fetch_json(site_url.rstrip('/') + '/feed.json')
         validate_manifest(manifest, feed)
         generated = datetime.fromisoformat(manifest['generated_at'].replace('Z', '+00:00'))
-        return (manifest.get('fingerprint') == expected_fingerprint
+        return (manifest.get('status') != 'unavailable'
+                and manifest.get('fingerprint') == expected_fingerprint
                 and generated.astimezone(JST).date() == now.astimezone(JST).date()
                 and -timedelta(minutes=5) <= now - generated <= timedelta(hours=18))
     except (OSError, ValueError, TypeError, KeyError, AttributeError):

@@ -128,6 +128,19 @@ class ClientTests(unittest.TestCase):
 
 class PipelineTests(unittest.TestCase):
     @patch.dict(os.environ, {'GITHUB_REF': 'refs/heads/test'})
+    def test_overlong_draft_is_repaired_not_regenerated(self):
+        long_draft = draft()
+        for item in long_draft['topics'].values():
+            item['text'] *= 2
+        client = FakeClient([long_draft, draft()])
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            generate_news.run(output=base / 'docs', work=base / 'work', now=NOW, client=client)
+            self.assertEqual(sum(c['search'] for c in client.calls), 1)
+            self.assertIn(json.dumps(long_draft), client.calls[-1]['prompt'])
+            validate_feed(json.loads((base / 'docs/feed.json').read_text()))
+
+    @patch.dict(os.environ, {'GITHUB_REF': 'refs/heads/test'})
     def test_complete_offline_pipeline_and_edit_only_retry(self):
         invalid = draft()
         invalid['topics'].pop('okinawa')
@@ -151,7 +164,7 @@ class PipelineTests(unittest.TestCase):
             (base / 'docs/feed.json').write_text('previous-feed')
             with self.assertRaises(RuntimeError):
                 generate_news.run(output=base / 'docs', work=base / 'work', now=NOW,
-                                  client=FakeClient([{}, {}, {}]))
+                                  client=FakeClient([{}, {}, {}, {}, {}]))
             self.assertEqual((base / 'docs/feed.json').read_text(), 'previous-feed')
             self.assertFalse((base / 'docs/manifest.json').exists())
 
