@@ -34,8 +34,8 @@ jobs:
       changed: ${{ steps.news.outputs.changed || steps.notice.outputs.changed }}
       degraded: ${{ steps.news.outcome == 'failure' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Offline regression tests
@@ -62,19 +62,19 @@ jobs:
         run: python availability.py
       - name: Save validated edition
         if: steps.news.outputs.changed == 'true' || steps.notice.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: alexa-news
           path: docs/
           retention-days: 7
       - name: Package Pages site
         if: (steps.news.outputs.changed == 'true' || steps.notice.outputs.changed == 'true') && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs
       - name: Save research for failure diagnosis
         if: failure() || steps.news.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: news-diagnostics
           path: work/research.json
@@ -96,11 +96,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: alexa-news
           path: expected-news
@@ -108,7 +108,7 @@ jobs:
         run: python verify_public_feed.py --before-deploy
       - name: Deploy validated edition
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
       - name: Verify public edition matches this run
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
@@ -122,14 +122,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: alexa-news
           path: expected-news
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Ensure this edition is still public before archiving
