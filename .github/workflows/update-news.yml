@@ -7,6 +7,8 @@ on:
         description: '当日分が公開済みでも再生成する（追加API料金）'
         type: boolean
         default: false
+  repository_dispatch:
+    types: [update-news]
   schedule:
     # Sunday–Thursday UTC = Monday–Friday JST. Recovery does no API work if current.
     - cron: '0 21 * * 0-4'
@@ -45,7 +47,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
-          FORCE_REGENERATE: ${{ inputs.force || false }}
+          FORCE_REGENERATE: ${{ inputs.force || github.event.client_payload.force || false }}
         run: |
           args=()
           if [ "$FORCE_REGENERATE" = 'true' ]; then

@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from helpers import NOW, draft, response
 from news_content import build_feed, collect_research
-from publication import already_published, fetch_json, json_bytes
+from publication import already_published, fetch_json, healthy_edition_published, json_bytes
 from verify_public_feed import verify
 
 
@@ -35,6 +35,11 @@ class PublicTests(unittest.TestCase):
         self.assertFalse(already_published('https://example.com/', NOW, 'current'))
         fetch.side_effect = OSError('unavailable')
         self.assertFalse(already_published('https://example.com/', NOW, 'current'))
+
+    @patch('publication.fetch_json')
+    def test_healthy_edition_is_preserved_after_code_change(self, fetch):
+        fetch.side_effect = [self.manifest, self.feed]
+        self.assertTrue(healthy_edition_published('https://example.com/', NOW))
 
     @patch('publication.urllib.request.urlopen')
     def test_https_json_and_size_are_required(self, opener):
