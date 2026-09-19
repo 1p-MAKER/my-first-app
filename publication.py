@@ -42,7 +42,13 @@ def validate_manifest(manifest, feed):
     if manifest.get('status') == 'unavailable':
         from availability import notice_feed
         generated = datetime.fromisoformat(manifest['generated_at'].replace('Z', '+00:00'))
-        if feed != notice_feed(generated):
+        try:
+            notice_url = feed[0]['redirectionUrl']
+        except (IndexError, KeyError, TypeError):
+            raise ValueError('更新失敗の案内が不正です。') from None
+        if not https_url(notice_url):
+            raise ValueError('更新失敗の案内URLはHTTPSが必要です。')
+        if feed != notice_feed(generated, notice_url):
             raise ValueError('更新失敗の案内が不正です。')
     else:
         validate_feed(feed)
@@ -53,16 +59,32 @@ def validate_manifest(manifest, feed):
         raise ValueError("生成日時が一致しません。")
 
 
-def already_published(site_url, now, expected_fingerprint):
-    """Fail open toward regeneration if the public site is missing or inconsistent."""
+def _current_edition(site_url, now):
+    """Return the validated public edition and timestamp, or ``None`` on any doubt."""
     try:
         manifest = fetch_json(site_url.rstrip('/') + '/manifest.json')
         feed = fetch_json(site_url.rstrip('/') + '/feed.json')
         validate_manifest(manifest, feed)
         generated = datetime.fromisoformat(manifest['generated_at'].replace('Z', '+00:00'))
-        return (manifest.get('status') != 'unavailable'
-                and manifest.get('fingerprint') == expected_fingerprint
-                and generated.astimezone(JST).date() == now.astimezone(JST).date()
-                and -timedelta(minutes=5) <= now - generated <= timedelta(hours=18))
+        if (manifest.get('status') == 'unavailable'
+                or generated.astimezone(JST).date() != now.astimezone(JST).date()
+                or not -timedelta(minutes=5) <= now - generated <= timedelta(hours=18)):
+            return None
+        return manifest, feed, generated
     except (OSError, ValueError, TypeError, KeyError, AttributeError):
-        return False
+        return None
+
+
+def healthy_edition_published(site_url, now):
+    """Check freshness without tying preservation to the current code fingerprint.
+
+    A valid edition already read by Alexa must survive a later failed retry, even
+    when the code or model changed after that edition was generated.
+    """
+    return _current_edition(site_url, now) is not None
+
+
+def already_published(site_url, now, expected_fingerprint):
+    """Check whether today's public edition matches this generator exactly."""
+    current = _current_edition(site_url, now)
+    return bool(current and current[0].get('fingerprint') == expected_fingerprint)
