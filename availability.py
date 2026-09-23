@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,15 +30,26 @@ def publish_notice(output=Path('docs'), now=None, site_url=None):
     feed = notice_feed(now, site_url)
     manifest = {'version': 2, 'status': 'unavailable', 'generated_at': iso_utc(now),
                 'fingerprint': identity, 'feed_sha256': hashlib.sha256(json_bytes(feed)).hexdigest()}
-    output.mkdir(parents=True, exist_ok=True)
-    (output / 'feed.json').write_bytes(json_bytes(feed))
-    (output / 'manifest.json').write_bytes(json_bytes(manifest))
-    (output / 'index.html').write_text('<!doctype html><meta charset="utf-8"><title>更新状況</title>'
-                                     + '<h1>朝ニュースの更新状況</h1><p>' + feed[0]['mainText'] + '</p>', encoding='utf-8')
+    files = {
+        'index.html': ('<!doctype html><meta charset="utf-8"><title>更新状況</title>'
+                       + '<h1>朝ニュースの更新状況</h1><p>' + feed[0]['mainText'] + '</p>').encode('utf-8'),
+        'manifest.json': json_bytes(manifest),
+        'feed.json': json_bytes(feed),
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='news-notice-', dir=output.parent) as temporary:
+        stage = Path(temporary)
+        for name, content in files.items():
+            (stage / name).write_bytes(content)
+        output.mkdir(parents=True, exist_ok=True)
+        # Prepare every file before replacing existing output; replace feed last.
+        for name in ('index.html', 'manifest.json', 'feed.json'):
+            (stage / name).replace(output / name)
     return True
 
 
 if __name__ == '__main__':
     changed = publish_notice()
-    with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-        output.write(f'changed={str(changed).lower()}\n')
+    if output_path := os.environ.get('GITHUB_OUTPUT'):
+        with open(output_path, 'a', encoding='utf-8') as output:
+            output.write(f'changed={str(changed).lower()}\n')

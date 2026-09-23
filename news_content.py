@@ -25,6 +25,17 @@ SECTIONS = [
     ("新商品・新サービス・AI・背景・予定", ("products", "services", "ai", "background")),
 ]
 REFS = {"type": "array", "items": {"type": "integer"}, "maxItems": 5}
+MARKET_TOPICS = {"stocks", "fx", "rates", "gold", "oil"}
+_NUMBER_TOKEN = re.compile(
+    r"(?:[0-9０-９](?:[0-9０-９,，]*[0-9０-９])?(?:[.．][0-9０-９]+)?"
+    r"|[〇零一二三四五六七八九十百千万億兆]+(?:点[〇零一二三四五六七八九]+)?)"
+)
+_KANJI_DIGITS = {"〇": 0, "零": 0, "一": 1, "二": 2, "三": 3, "四": 4,
+                 "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+_SMALL_UNITS = {"十": 10, "百": 100, "千": 1000}
+_LARGE_UNITS = {"万": 10_000, "億": 100_000_000, "兆": 1_000_000_000_000}
+_UP_WORDS = ("上昇", "上が", "上げ", "高騰", "反発", "値上がり", "増加")
+_DOWN_WORDS = ("下落", "下が", "下げ", "低下", "急落", "続落", "反落", "値下がり", "減少")
 TOPIC_SCHEMA = {
     "type": "object", "properties": {
         "status": {"type": "string", "enum": ["verified", "unconfirmed"]},
@@ -112,6 +123,8 @@ eventsは重要な最大2件を優先し各本文は50文字程度。挨拶と�
 数字と単位を耳で理解できる形にする。出典名を適宜短く読み上げ、同じ詳細の繰り返しは省く。
 headlinesは最重要3件を短く案内。挨拶と日付はプログラム側が付けるので書かない。
 市場の値は根拠のある単位・時点・比較対象を省かず、休場を当日の値のように扱わない。
+「AからBへ上昇／下落」と書く場合、AとBの大小関係を必ず計算して表現を一致させる。
+比較前後の対象・単位・時間が異なる場合は同じ文で増減比較せず、混同を避ける。
 perspective_aとperspective_bは同じ重要論点に対する異なる視点。事実と予測を分ける。
 productsとservicesは別々に扱う。backgroundは最重要ニュースの背景。全topic必須。
 確認できるtopicはstatus=verifiedとし、根拠を含むevidenceに対応したsource_idsを必ず付ける。
@@ -134,6 +147,62 @@ def plain_text(value):
     if len(text.encode("utf-16-le")) // 2 > 4300:
         raise ValueError("本文が4300文字を超えています。")
     return text
+
+
+def _parse_number(token):
+    normalized = unicodedata.normalize("NFKC", token)
+    if re.fullmatch(r"[0-9,]+(?:\.[0-9]+)?", normalized):
+        return float(normalized.replace(",", ""))
+    integer, dot, fraction = normalized.partition("点")
+    total = section = number = 0
+    for char in integer:
+        if char in _KANJI_DIGITS:
+            number = _KANJI_DIGITS[char]
+        elif char in _SMALL_UNITS:
+            section += (number or 1) * _SMALL_UNITS[char]
+            number = 0
+        elif char in _LARGE_UNITS:
+            section += number
+            total += (section or 1) * _LARGE_UNITS[char]
+            section = number = 0
+        else:
+            return None
+    value = total + section + number
+    if dot and fraction:
+        value += sum(_KANJI_DIGITS[c] / (10 ** i) for i, c in enumerate(fraction, 1))
+    return float(value)
+
+
+def validate_market_direction(text):
+    """Reject explicit from-to market comparisons that contradict their trend word."""
+    for sentence in re.split(r"[。！？\n]", text):
+        for connector in re.finditer(r"から", sentence):
+            left_matches = list(_NUMBER_TOKEN.finditer(sentence[:connector.start()]))
+            right = _NUMBER_TOKEN.search(sentence, connector.end())
+            if not left_matches or not right:
+                continue
+            left = left_matches[-1]
+            if connector.start() - left.end() > 12 or right.start() - connector.end() > 12:
+                continue
+            # Only treat this as a comparison when the second value is explicitly
+            # introduced as the destination value ("AからBへ...").
+            tail = sentence[right.end():right.end() + 32]
+            destination = re.match(r"(?:[\w％%円銭ドルユーロポンド台程度前後の]+)?(?:へ|に)", tail)
+            if not destination:
+                continue
+            start_value, end_value = _parse_number(left.group()), _parse_number(right.group())
+            if start_value is None or end_value is None or start_value == end_value:
+                continue
+            after_destination = tail[destination.end():]
+            trend_hits = [(after_destination.find(word), direction)
+                          for direction, words in ((1, _UP_WORDS), (-1, _DOWN_WORDS))
+                          for word in words if word in after_destination]
+            trend_hits = [hit for hit in trend_hits if hit[0] >= 0]
+            if not trend_hits:
+                continue
+            _, direction = min(trend_hits)
+            if (direction == 1 and end_value < start_value) or (direction == -1 and end_value > start_value):
+                raise ValueError("市場価格の『AからBへ』と上昇・下落の表現が数値と矛盾しています。")
 
 
 def validate_refs(refs, allowed, *, required=True):
@@ -164,6 +233,8 @@ def build_feed(draft, research, now, site_url=SITE_URL):
         elif item["status"] == "verified":
             validate_refs(item["source_ids"], allowed)
             texts[key] = plain_text(item["text"])
+            if key in MARKET_TOPICS:
+                validate_market_direction(texts[key])
             verified.add(key)
         else:
             raise ValueError(f"{key}の確認状態が不正です。")
