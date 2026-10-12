@@ -1,26 +1,44 @@
 {
   "version": 2,
-  "generated_at": "2026-10-11T20:45:10Z",
+  "generated_at": "2026-10-12T20:45:14Z",
   "fingerprint": "1c7cc9309e81eccfc520e9a225b78c08c52cf44991d31e53557c22ec1c1045b5",
   "model": "gemini-3.8-flash",
-  "feed_sha256": "9f0ce43437436ef0cc9692d1cc34eac0dc332f0465e6c9545db0e263934e2f44",
-  "characters": 1996,
-  "unconfirmed_topics": [],
-  "search_query_count": 13,
-  "api_attempts": 2,
+  "feed_sha256": "9dd58ece09707bc81563d788f6799e39a324bec7ce5c8bdd4a3061170e7c72cd",
+  "characters": 1848,
+  "unconfirmed_topics": [
+    "japan",
+    "products",
+    "services"
+  ],
+  "search_query_count": 11,
+  "api_attempts": 4,
   "usage": [
     {
       "stage": "research",
-      "promptTokenCount": 835,
-      "candidatesTokenCount": 3920,
-      "thoughtsTokenCount": 3223,
-      "totalTokenCount": 7978
+      "promptTokenCount": 948,
+      "candidatesTokenCount": 3898,
+      "thoughtsTokenCount": 2766,
+      "totalTokenCount": 7612
     },
     {
       "stage": "edit",
-      "promptTokenCount": 14270,
-      "candidatesTokenCount": 1886,
-      "totalTokenCount": 16156
+      "promptTokenCount": 13516,
+      "candidatesTokenCount": 1357,
+      "thoughtsTokenCount": 1514,
+      "totalTokenCount": 16387
+    },
+    {
+      "stage": "edit",
+      "promptTokenCount": 14980,
+      "candidatesTokenCount": 1459,
+      "totalTokenCount": 16439
+    },
+    {
+      "stage": "edit",
+      "promptTokenCount": 15081,
+      "candidatesTokenCount": 1517,
+      "thoughtsTokenCount": 8503,
+      "totalTokenCount": 25101
     }
   ]
 }
