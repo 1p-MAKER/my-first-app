@@ -1,27 +1,47 @@
 {
   "version": 2,
-  "generated_at": "2026-10-21T20:45:10Z",
+  "generated_at": "2026-10-22T20:45:12Z",
   "fingerprint": "1c7cc9309e81eccfc520e9a225b78c08c52cf44991d31e53557c22ec1c1045b5",
   "model": "gemini-3.8-flash",
-  "feed_sha256": "cb89d86a3794e0531463f2185abc13eeeaa79cd1a97d6178887855d4184fd0c0",
-  "characters": 1875,
+  "feed_sha256": "160aafb106c5003bbe827c8a76fb0e27e58c1d22fab19d8775883f3b3ef33c5b",
+  "characters": 1962,
   "unconfirmed_topics": [],
   "search_query_count": 11,
-  "api_attempts": 2,
+  "api_attempts": 5,
   "usage": [
     {
       "stage": "research",
-      "promptTokenCount": 838,
-      "candidatesTokenCount": 4685,
-      "thoughtsTokenCount": 3942,
-      "totalTokenCount": 9465
+      "promptTokenCount": 999,
+      "candidatesTokenCount": 4615,
+      "thoughtsTokenCount": 3160,
+      "totalTokenCount": 8774
     },
     {
       "stage": "edit",
-      "promptTokenCount": 10347,
-      "candidatesTokenCount": 1562,
-      "thoughtsTokenCount": 3136,
-      "totalTokenCount": 15045
+      "promptTokenCount": 12108,
+      "candidatesTokenCount": 1880,
+      "thoughtsTokenCount": 2300,
+      "totalTokenCount": 16288
+    },
+    {
+      "stage": "edit",
+      "promptTokenCount": 14094,
+      "candidatesTokenCount": 1891,
+      "thoughtsTokenCount": 1552,
+      "totalTokenCount": 17537
+    },
+    {
+      "stage": "edit",
+      "promptTokenCount": 14105,
+      "candidatesTokenCount": 1560,
+      "thoughtsTokenCount": 5876,
+      "totalTokenCount": 21541
+    },
+    {
+      "stage": "edit",
+      "promptTokenCount": 13774,
+      "candidatesTokenCount": 1558,
+      "totalTokenCount": 15332
     }
   ]
 }
