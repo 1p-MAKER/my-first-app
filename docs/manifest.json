@@ -1,36 +1,7 @@
 {
   "version": 2,
-  "generated_at": "2026-10-26T20:45:13Z",
+  "status": "unavailable",
+  "generated_at": "2026-10-27T20:47:16Z",
   "fingerprint": "1c7cc9309e81eccfc520e9a225b78c08c52cf44991d31e53557c22ec1c1045b5",
-  "model": "gemini-3.8-flash",
-  "feed_sha256": "4358bf3ae3707f2319a01d3497c9c064b900781c074be5786d917d05044ef058",
-  "characters": 2060,
-  "unconfirmed_topics": [
-    "products",
-    "services"
-  ],
-  "search_query_count": 7,
-  "api_attempts": 3,
-  "usage": [
-    {
-      "stage": "research",
-      "promptTokenCount": 685,
-      "candidatesTokenCount": 3740,
-      "thoughtsTokenCount": 622,
-      "totalTokenCount": 5047
-    },
-    {
-      "stage": "edit",
-      "promptTokenCount": 6909,
-      "candidatesTokenCount": 1258,
-      "thoughtsTokenCount": 2129,
-      "totalTokenCount": 10296
-    },
-    {
-      "stage": "edit",
-      "promptTokenCount": 8274,
-      "candidatesTokenCount": 1555,
-      "totalTokenCount": 9829
-    }
-  ]
+  "feed_sha256": "f055cf26b2b48c1c1b76bb98efbc2f4e7a2f6e3f4cec0012c323e6fb4da4693e"
 }
