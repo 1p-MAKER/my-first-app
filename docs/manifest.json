@@ -1,27 +1,26 @@
 {
   "version": 2,
-  "generated_at": "2026-10-28T21:30:32Z",
+  "generated_at": "2026-10-29T20:45:11Z",
   "fingerprint": "1c7cc9309e81eccfc520e9a225b78c08c52cf44991d31e53557c22ec1c1045b5",
   "model": "gemini-3.8-flash",
-  "feed_sha256": "9302f86183a00f2fece05c64ec9b988019893f08e6b05b26699f9c802a315b4e",
-  "characters": 1979,
+  "feed_sha256": "01444ced8c9ac8ffa1f476982d2eb302078b7ae1eb378cedd393d70395eca225",
+  "characters": 1863,
   "unconfirmed_topics": [],
-  "search_query_count": 9,
+  "search_query_count": 11,
   "api_attempts": 2,
   "usage": [
     {
       "stage": "research",
-      "promptTokenCount": 1607,
-      "candidatesTokenCount": 3581,
-      "thoughtsTokenCount": 1451,
-      "totalTokenCount": 6639
+      "promptTokenCount": 759,
+      "candidatesTokenCount": 4111,
+      "thoughtsTokenCount": 2181,
+      "totalTokenCount": 7051
     },
     {
       "stage": "edit",
-      "promptTokenCount": 8535,
-      "candidatesTokenCount": 1591,
-      "thoughtsTokenCount": 3965,
-      "totalTokenCount": 14091
+      "promptTokenCount": 10645,
+      "candidatesTokenCount": 1678,
+      "totalTokenCount": 12323
     }
   ]
 }
